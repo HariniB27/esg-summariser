@@ -1,5 +1,5 @@
 const axios = require("axios");
-const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+const pdfParse = require("pdf-parse");
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024;
 const TIMEOUT_MS = 30000;
@@ -59,18 +59,14 @@ module.exports = async function handler(req, res) {
 
   if (contentType.includes("pdf") || url.toLowerCase().endsWith(".pdf")) {
     try {
-      const uint8 = new Uint8Array(buffer);
-      const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map((item) => item.str).join(" ") + "\n";
-      }
-      if (!text.trim()) {
+      const pdfData = await pdfParse(buffer);
+      const fullText = pdfData.text;
+      if (!fullText || !fullText.trim()) {
         return res.status(422).json({
           error: "Could not extract text from this PDF — it may be a scanned/image-based document",
         });
       }
+      text = fullText;
     } catch (err) {
       return res.status(422).json({ error: `PDF parsing failed: ${err.message}` });
     }
