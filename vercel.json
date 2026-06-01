@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/fetch-report.js": {
+      "maxDuration": 30
+    }
+  }
+}
