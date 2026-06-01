@@ -166,35 +166,42 @@ function scoreColor(score, max) {
 
 function CircleScore({ score, max = 100, size = 120 }) {
   const color = scoreColor(score, max);
-  const r = (size - 12) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = (size - 16) / 2;
   const circ = 2 * Math.PI * r;
   const fill = circ * (score / max);
   return (
-    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-border-secondary)" strokeWidth={8} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke={color} strokeWidth={8}
-        strokeDasharray={`${fill} ${circ - fill}`}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dasharray 1s ease" }}
-      />
+    <svg width={size} height={size}>
+      {/* Arc rings — rotated so arc starts from top */}
+      <g transform={`rotate(-90, ${cx}, ${cy})`}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--color-border-secondary)" strokeWidth={8} />
+        <circle
+          cx={cx} cy={cy} r={r} fill="none"
+          stroke={color} strokeWidth={8}
+          strokeDasharray={`${fill} ${circ - fill}`}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 1s ease" }}
+        />
+      </g>
+      {/* Score number — centered, normal orientation */}
       <text
-        x={size / 2} y={size / 2 + 1}
+        x={cx} y={cy - size * 0.06}
         textAnchor="middle" dominantBaseline="middle"
         fill={color}
-        fontSize={size * 0.22}
-        fontWeight="600"
-        style={{ transform: `rotate(90deg) translate(0px, -${size}px)`, transformOrigin: `${size / 2}px ${size / 2}px` }}
+        fontSize={size * 0.24}
+        fontWeight="700"
+        fontFamily="inherit"
       >
         {score}
       </text>
+      {/* "/ max" label */}
       <text
-        x={size / 2} y={size / 2 + size * 0.155}
+        x={cx} y={cy + size * 0.19}
         textAnchor="middle" dominantBaseline="middle"
         fill="var(--color-text-tertiary)"
-        fontSize={size * 0.1}
-        style={{ transform: `rotate(90deg) translate(0px, -${size}px)`, transformOrigin: `${size / 2}px ${size / 2}px` }}
+        fontSize={size * 0.11}
+        fontFamily="inherit"
       >
         / {max}
       </text>
