@@ -1,6 +1,4 @@
 import { useState, useRef, useCallback } from "react";
-import * as pdfjsLib from "pdfjs-dist";
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs`;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -494,38 +492,18 @@ export default function ESGApp() {
   const fileRef = useRef();
   const resultRef = useRef();
 
-  const handleFileUpload = useCallback(async (e) => {
+  const handleFileUpload = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 20 * 1024 * 1024) { setError("This file is too large. Please upload a file under 20MB."); return; }
+    if (file.size > 20 * 1024 * 1024) { setError("File exceeds 20MB limit."); return; }
     setFileName(file.name);
     setError("");
-
-    if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          fullText += content.items.map((item) => item.str).join(" ") + "\n";
-        }
-        if (!fullText.trim()) {
-          setError("This PDF appears to be image-based (scanned). Only text-based PDFs are supported.");
-          return;
-        }
-        setFileText(fullText);
-      } catch (err) {
-        setError("Could not read PDF: " + err.message);
-      }
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onload = (evt) => setFileText(evt.target.result);
-    reader.onerror = () => setError("Could not read the file. Please try again.");
-    reader.readAsText(file);
+    reader.onload = (evt) => {
+      setFileText(evt.target.result); // store as base64 data URL
+    };
+    reader.onerror = () => setError("Failed to read file.");
+    reader.readAsDataURL(file); // read as base64
   }, []);
 
   const handleProcess = useCallback(async () => {
@@ -554,8 +532,25 @@ export default function ESGApp() {
         return;
       }
     } else if (inputMode === "file") {
-      if (!fileText) { setError("Please upload a file before proceeding."); return; }
-      reportText = fileText;
+      if (!fileText) { setError("Please upload a file first."); return; }
+      setLoading(true);
+      setCurrentStep(2);
+      setLoadingMsg("Extracting text from document...");
+      try {
+        const response = await fetch("/api/fetch-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileData: fileText, fileName: fileName }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to extract text.");
+        reportText = data.text;
+      } catch (err) {
+        setError(`Could not read PDF: ${err.message}`);
+        setLoading(false);
+        setCurrentStep(1);
+        return;
+      }
     } else if (inputMode === "text") {
       if (!textInput.trim()) { setError("Please paste some report text before proceeding."); return; }
       if (textInput.trim().length < 200) { setError("The text is too short. Please paste more of the report content for accurate analysis."); return; }
@@ -591,7 +586,7 @@ export default function ESGApp() {
       setLoading(false);
       setLoadingMsg("");
     }
-  }, [inputMode, urlInput, textInput, fileText]);
+  }, [inputMode, urlInput, textInput, fileText, fileName]);
 
   const handleCopy = () => {
     if (!result?.pickaxeSummary) return;
@@ -720,8 +715,8 @@ export default function ESGApp() {
                   {fileName || "Click to upload or drag file here"}
                 </div>
                 {fileText
-                  ? <div style={{ fontSize: 12, color: C.env }}>{fileText.length.toLocaleString()} characters extracted</div>
-                  : <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>PDF or TXT — max 20 MB. Image-based PDFs not supported.</div>
+                  ? <div style={{ fontSize: 12, color: C.env }}>Ready — text will be extracted on the server</div>
+                  : <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>PDF or TXT — max 20 MB</div>
                 }
                 <input ref={fileRef} type="file" accept=".pdf,.txt,.md" onChange={handleFileUpload} style={{ display: "none" }} />
               </div>
